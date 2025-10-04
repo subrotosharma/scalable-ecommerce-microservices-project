@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-schemas/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  user-service:
+    build: ./microservices/user-service
+    ports:
+      - "8001:8080"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ecommerce
+      DB_USER: admin
+      DB_PASSWORD: password
+      REDIS_HOST: redis
+    depends_on:
+      - postgres
+      - redis
+
+  product-service:
+    build: ./microservices/product-service
+    ports:
+      - "8002:8080"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ecommerce
+      DB_USER: admin
+      DB_PASSWORD: password
+      REDIS_HOST: redis
+    depends_on:
+      - postgres
+      - redis
+
+  order-service:
+    build: ./microservices/order-service
+    ports:
+      - "8003:8080"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ecommerce
+      DB_USER: admin
+      DB_PASSWORD: password
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+    depends_on:
+      - postgres
+
+  payment-service:
+    build: ./microservices/payment-service
+    ports:
+      - "8004:8080"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ecommerce
+      DB_USER: admin
+      DB_PASSWORD: password
+    depends_on:
+      - postgres
+
+  cart-service:
+    build: ./microservices/cart-service
+    ports:
+      - "8005:8080"
+    environment:
+      REDIS_HOST: redis
+    depends_on:
+      - redis
+
+  api-gateway:
+    build: ./microservices/api-gateway
+    ports:
+      - "8000:8080"
+    environment:
+      USER_SERVICE_URL: http://user-service:8080
+      PRODUCT_SERVICE_URL: http://product-service:8080
+      ORDER_SERVICE_URL: http://order-service:8080
+      PAYMENT_SERVICE_URL: http://payment-service:8080
+      CART_SERVICE_URL: http://cart-service:8080
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+      - cart-service
+
+  web-frontend:
+    build: ./microservices/web-frontend
+    ports:
+      - "3000:8080"
+    environment:
+      API_GATEWAY_URL: http://api-gateway:8080
+    depends_on:
+      - api-gateway
+
+volumes:
+  postgres_data:
+  redis_data:
