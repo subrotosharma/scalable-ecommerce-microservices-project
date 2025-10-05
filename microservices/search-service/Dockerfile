@@ -1,7 +1,7 @@
 FROM node:18-alpine
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --production
+RUN npm install
 COPY . .
-EXPOSE 8080
-CMD ["npm", "start"]
+EXPOSE 8087
+CMD ["node", "server.js"]

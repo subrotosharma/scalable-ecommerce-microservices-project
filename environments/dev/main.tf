@@ -8,10 +8,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "multi-account-infra-terraform-state-12345678"  # Update with actual bucket name
+    bucket         = "easybuybd-terraform-state-d8ae1351"
     key            = "environments/dev/terraform.tfstate"
     region         = "us-west-2"
-    dynamodb_table = "multi-account-infra-terraform-locks"
+    dynamodb_table = "easybuybd-terraform-locks"
     encrypt        = true
   }
 }

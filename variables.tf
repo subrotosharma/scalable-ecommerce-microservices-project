@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name"
   type        = string
-  default     = "marketplace-pro"
+  default     = "easybuybd"
 }
 
 variable "account_id" {

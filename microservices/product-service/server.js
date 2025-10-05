@@ -1,97 +1,107 @@
 const express = require('express');
 const { Pool } = require('pg');
-const redis = require('redis');
 const cors = require('cors');
 const helmet = require('helmet');
+const csrf = require('csurf');
+const rateLimit = require('express-rate-limit');
+const winston = require('winston');
+const { authenticateToken } = require('../middleware/auth');
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [new winston.transports.Console()]
+});
 
 const app = express();
-const port = process.env.PORT || 8080;
-
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000'
+}));
+
+const productLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests'
+});
+
+app.use('/api/products', productLimiter);
+app.use(express.json({ limit: '1mb' }));
+
+const csrfProtection = csrf({ 
+  cookie: { 
+    httpOnly: true, 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  } 
+});
+// Apply CSRF protection to state-changing operations only
+app.use('/api/products', (req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    return csrfProtection(req, res, next);
+  }
+  next();
+});
 
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME || 'productdb',
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  port: 5432,
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'easybuybd',
+  password: process.env.DB_PASSWORD || 'password',
+  port: process.env.DB_PORT || 5432,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000
 });
 
-const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST,
-  port: 6379
-});
+const validateSearchInput = (input) => {
+  if (typeof input !== 'string') return '';
+  return input.trim().substring(0, 100);
+};
 
+// Get all products with pagination and filtering
 app.get('/api/products', async (req, res) => {
   try {
-    const { category, brand, minPrice, maxPrice, rating, sortBy = 'created_at', sortOrder = 'DESC', page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, category, search, minPrice, maxPrice } = req.query;
     const offset = (page - 1) * limit;
     
-    let query = `
-      SELECT p.*, c.name as category_name, b.name as brand_name, 
-             AVG(r.rating) as avg_rating, COUNT(r.id) as review_count,
-             i.stock_quantity
-      FROM products p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN brands b ON p.brand_id = b.id
-      LEFT JOIN reviews r ON p.id = r.product_id
-      LEFT JOIN inventory i ON p.id = i.product_id
-      WHERE p.status = 'active'
-    `;
-    let params = [];
+    let query = 'SELECT * FROM products WHERE 1=1';
+    const params = [];
     let paramCount = 0;
-    
+
     if (category) {
-      query += ` AND c.slug = $${++paramCount}`;
+      query += ` AND category = $${++paramCount}`;
       params.push(category);
     }
     
-    if (brand) {
-      query += ` AND b.slug = $${++paramCount}`;
-      params.push(brand);
+    if (search) {
+      query += ` AND (name ILIKE $${++paramCount} OR description ILIKE $${++paramCount})`;
+      params.push(`%${search}%`, `%${search}%`);
+      paramCount++;
     }
     
     if (minPrice) {
-      query += ` AND p.price >= $${++paramCount}`;
+      query += ` AND price >= $${++paramCount}`;
       params.push(minPrice);
     }
     
     if (maxPrice) {
-      query += ` AND p.price <= $${++paramCount}`;
+      query += ` AND price <= $${++paramCount}`;
       params.push(maxPrice);
     }
-    
-    query += ` GROUP BY p.id, c.name, b.name, i.stock_quantity`;
-    
-    if (rating) {
-      query += ` HAVING AVG(r.rating) >= $${++paramCount}`;
-      params.push(rating);
-    }
-    
-    query += ` ORDER BY ${sortBy} ${sortOrder} LIMIT $${++paramCount} OFFSET $${++paramCount}`;
+
+    query += ` ORDER BY created_at DESC LIMIT $${++paramCount} OFFSET $${++paramCount}`;
     params.push(limit, offset);
-    
+
     const result = await pool.query(query, params);
-    
-    // Get total count for pagination
-    const countResult = await pool.query('SELECT COUNT(*) FROM products WHERE status = \'active\'');
-    
-    res.json({
-      products: result.rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: parseInt(countResult.rows[0].count),
-        totalPages: Math.ceil(countResult.rows[0].count / limit)
-      }
-    });
+    res.json(result.rows);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
+// Get product by ID
 app.get('/api/products/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
@@ -100,44 +110,61 @@ app.get('/api/products/:id', async (req, res) => {
     }
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/products', async (req, res) => {
+// Create product (admin only)
+app.post('/api/products', authenticateToken, async (req, res) => {
   try {
-    const { name, description, price, category, stock } = req.body;
-    
+    const { name, description, price, category, image_url, stock_quantity } = req.body;
     const result = await pool.query(
-      'INSERT INTO products (name, description, price, category, stock) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, description, price, category, stock]
+      'INSERT INTO products (name, description, price, category, image_url, stock_quantity) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, description, price, category, image_url, stock_quantity]
     );
-    
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+// Update product
+app.put('/api/products/:id', authenticateToken, async (req, res) => {
   try {
-    const { name, description, price, category, stock } = req.body;
-    
+    const { name, description, price, category, image_url, stock_quantity } = req.body;
     const result = await pool.query(
-      'UPDATE products SET name = $1, description = $2, price = $3, category = $4, stock = $5 WHERE id = $6 RETURNING *',
-      [name, description, price, category, stock, req.params.id]
+      'UPDATE products SET name = $1, description = $2, price = $3, category = $4, image_url = $5, stock_quantity = $6, updated_at = NOW() WHERE id = $7 RETURNING *',
+      [name, description, price, category, image_url, stock_quantity, req.params.id]
     );
-    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     res.json(result.rows[0]);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'product-service' });
+// Get categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT DISTINCT category FROM products ORDER BY category');
+    res.json(result.rows.map(row => row.category));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.listen(port, () => {
-  console.log(`Product service running on port ${port}`);
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'healthy', service: 'product-service' });
+  } catch (error) {
+    res.status(503).json({ status: 'unhealthy', service: 'product-service' });
+  }
+});
+
+const PORT = process.env.PORT || 8084;
+app.listen(PORT, () => {
+  console.log(`Product service running on port ${PORT}`);
 });

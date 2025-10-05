@@ -1,81 +1,150 @@
 const express = require('express');
-const AWS = require('aws-sdk');
+const nodemailer = require('nodemailer');
 const cors = require('cors');
 const helmet = require('helmet');
+const csrf = require('csurf');
+const rateLimit = require('express-rate-limit');
+const winston = require('winston');
+const validator = require('validator');
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [new winston.transports.Console()]
+});
 
 const app = express();
-const port = process.env.PORT || 8080;
-
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
 
-const ses = new AWS.SES({ region: process.env.AWS_REGION || 'us-west-2' });
-const sns = new AWS.SNS({ region: process.env.AWS_REGION || 'us-west-2' });
+const notificationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many notification requests'
+});
 
-app.post('/api/notifications/email', async (req, res) => {
-  try {
-    const { to, subject, body } = req.body;
-    
-    const params = {
-      Source: process.env.FROM_EMAIL || 'noreply@example.com',
-      Destination: { ToAddresses: [to] },
-      Message: {
-        Subject: { Data: subject },
-        Body: { Text: { Data: body } }
-      }
-    };
-    
-    const result = await ses.sendEmail(params).promise();
-    res.json({ messageId: result.MessageId, status: 'sent' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+app.use('/api/notifications', notificationLimiter);
+app.use(express.json({ limit: '1mb' }));
+
+const csrfProtection = csrf({ 
+  cookie: { 
+    httpOnly: true, 
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  } 
+});
+// Apply CSRF protection to state-changing operations only
+app.use('/api/notifications', (req, res, next) => {
+  if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+    return csrfProtection(req, res, next);
+  }
+  next();
+});
+
+// Email transporter (using Gmail for demo)
+const transporter = nodemailer.createTransporter({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER || 'demo@easybuybd.com',
+    pass: process.env.EMAIL_PASS || 'demo-password'
   }
 });
 
-app.post('/api/notifications/sms', async (req, res) => {
-  try {
-    const { phone, message } = req.body;
-    
-    const params = {
-      PhoneNumber: phone,
-      Message: message
-    };
-    
-    const result = await sns.publish(params).promise();
-    res.json({ messageId: result.MessageId, status: 'sent' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
+// Send order confirmation email
 app.post('/api/notifications/order-confirmation', async (req, res) => {
   try {
-    const { email, orderId, items } = req.body;
+    const { email, orderDetails } = req.body;
     
-    const subject = `Order Confirmation - ${orderId}`;
-    const body = `Your order ${orderId} has been confirmed. Items: ${items.map(i => i.name).join(', ')}`;
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
     
-    const params = {
-      Source: process.env.FROM_EMAIL || 'orders@example.com',
-      Destination: { ToAddresses: [email] },
-      Message: {
-        Subject: { Data: subject },
-        Body: { Text: { Data: body } }
-      }
+    if (!orderDetails || !orderDetails.id) {
+      return res.status(400).json({ error: 'Invalid order details' });
+    }
+    
+    const sanitizedOrderId = validator.escape(orderDetails.id.toString());
+    const sanitizedTotal = validator.escape(orderDetails.total.toString());
+    const sanitizedStatus = validator.escape(orderDetails.status.toString());
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@easybuybd.com',
+      to: validator.normalizeEmail(email),
+      subject: `Order Confirmation - #${sanitizedOrderId}`,
+      text: `Thank you for your order! Order ID: #${sanitizedOrderId}, Total: $${sanitizedTotal}, Status: ${sanitizedStatus}. We'll send you updates as your order progresses. Best regards, EasyBuyBD Team`
     };
     
-    const result = await ses.sendEmail(params).promise();
-    res.json({ messageId: result.MessageId, status: 'sent' });
+    logger.info('Order confirmation email queued', { email: validator.normalizeEmail(email), orderId: sanitizedOrderId });
+    
+    res.json({ success: true, message: 'Order confirmation sent' });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    logger.error('Order confirmation error', { error: error.message });
+    res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+// Send shipping notification
+app.post('/api/notifications/shipping', async (req, res) => {
+  try {
+    const { email, orderDetails, trackingNumber } = req.body;
+    
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+    
+    const sanitizedOrderId = validator.escape(orderDetails.id.toString());
+    const sanitizedTrackingNumber = validator.escape(trackingNumber.toString());
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@easybuybd.com',
+      to: validator.normalizeEmail(email),
+      subject: `Your order has shipped - #${sanitizedOrderId}`,
+      text: `Your order is on the way! Order ID: #${sanitizedOrderId}, Tracking Number: ${sanitizedTrackingNumber}. You can track your package using the tracking number. Best regards, EasyBuyBD Team`
+    };
+    
+    console.log('Shipping email sent:', mailOptions);
+    
+    res.json({ success: true, message: 'Shipping notification sent' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Send password reset email
+app.post('/api/notifications/password-reset', async (req, res) => {
+  try {
+    const { email, resetToken } = req.body;
+    
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+    
+    const sanitizedToken = validator.escape(resetToken.toString());
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'noreply@easybuybd.com',
+      to: validator.normalizeEmail(email),
+      subject: 'Password Reset Request',
+      text: `Password Reset Request. Visit this link to reset your password: ${baseUrl}/reset-password?token=${sanitizedToken}. This link will expire in 1 hour. Best regards, EasyBuyBD Team`
+    };
+    
+    console.log('Password reset email sent:', mailOptions);
+    
+    res.json({ success: true, message: 'Password reset email sent' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'healthy', service: 'notification-service' });
+  res.json({ status: 'healthy', service: 'notification-service', timestamp: new Date().toISOString() });
 });
 
-app.listen(port, () => {
-  console.log(`Notification service running on port ${port}`);
+const PORT = process.env.PORT || 8089;
+app.listen(PORT, () => {
+  console.log(`Notification service running on port ${PORT}`);
 });

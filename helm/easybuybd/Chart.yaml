@@ -1,0 +1,25 @@
+apiVersion: v2
+name: easybuybd
+description: EasyBuyBD E-commerce Microservices Platform
+type: application
+version: 1.0.0
+appVersion: "2.1.0"
+keywords:
+  - ecommerce
+  - microservices
+  - nodejs
+home: https://easybuybd.com
+sources:
+  - https://github.com/subrotosharma/easybuybd-ecommerce
+maintainers:
+  - name: Subroto Sharma
+    email: subroto@easybuybd.com
+dependencies:
+  - name: postgresql
+    version: 12.1.9
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: 17.3.7
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

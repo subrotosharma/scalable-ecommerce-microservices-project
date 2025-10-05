@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyBuyBD - Your Everything Store</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-top">
+            <div class="container">
+                <div class="logo">
+                    <h1><i class="fas fa-shopping-cart"></i> EasyBuyBD</h1>
+                </div>
+                <div class="search-bar">
+                    <select id="categorySelect">
+                        <option value="">All Categories</option>
+                    </select>
+                    <input type="text" id="searchInput" placeholder="Search products...">
+                    <button onclick="searchProducts()"><i class="fas fa-search"></i></button>
+                </div>
+                <div class="header-actions">
+                    <div class="account-menu">
+                        <i class="fas fa-user"></i>
+                        <span>Account</span>
+                        <div class="dropdown">
+                            <a href="#" onclick="showLogin()">Sign In</a>
+                            <a href="#" onclick="showRegister()">Register</a>
+                            <a href="#" onclick="showOrders()">Orders</a>
+                        </div>
+                    </div>
+                    <div class="cart" onclick="showCart()">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span id="cartCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <nav class="nav-bar">
+            <div class="container">
+                <ul class="nav-menu">
+                    <li><a href="#" onclick="showHome()">Home</a></li>
+                    <li><a href="#" onclick="showDeals()">Today's Deals</a></li>
+                    <li><a href="#" onclick="showCategories()">Categories</a></li>
+                    <li><a href="#" onclick="showBestSellers()">Best Sellers</a></li>
+                    <li><a href="#" onclick="showNewArrivals()">New Arrivals</a></li>
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main id="mainContent">
+        <!-- Home Page -->
+        <div id="homePage" class="page active">
+            <!-- Hero Banner -->
+            <section class="hero-banner">
+                <div class="banner-slide active">
+                    <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1200&h=400&fit=crop" alt="Electronics Sale">
+                    <div class="banner-content">
+                        <h2>Electronics Mega Sale</h2>
+                        <p>Up to 70% off on latest gadgets</p>
+                        <button onclick="showCategory('electronics')">Shop Now</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Categories Grid -->
+            <section class="categories-section">
+                <div class="container">
+                    <h2>Shop by Category</h2>
+                    <div id="categoriesGrid" class="categories-grid"></div>
+                </div>
+            </section>
+
+            <!-- Featured Products -->
+            <section class="featured-products">
+                <div class="container">
+                    <h2>Featured Products</h2>
+                    <div id="featuredProducts" class="products-grid"></div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Category Page -->
+        <div id="categoryPage" class="page">
+            <div class="container">
+                <div class="breadcrumb">
+                    <span onclick="showHome()">Home</span> > <span id="currentCategory"></span>
+                </div>
+                <div class="category-header">
+                    <h1 id="categoryTitle"></h1>
+                    <div class="filters">
+                        <select id="sortBy" onchange="sortProducts()">
+                            <option value="featured">Featured</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                            <option value="rating">Customer Rating</option>
+                            <option value="newest">Newest</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="categoryProducts" class="products-grid"></div>
+            </div>
+        </div>
+
+        <!-- Product Detail Page -->
+        <div id="productPage" class="page">
+            <div class="container">
+                <div class="breadcrumb">
+                    <span onclick="showHome()">Home</span> > 
+                    <span id="productBreadcrumb"></span> > 
+                    <span id="productName"></span>
+                </div>
+                <div class="product-detail">
+                    <div class="product-images">
+                        <img id="mainProductImage" src="" alt="">
+                        <div id="thumbnails" class="thumbnails"></div>
+                    </div>
+                    <div class="product-info">
+                        <h1 id="productTitle"></h1>
+                        <div class="rating">
+                            <div id="productRating" class="stars"></div>
+                            <span id="reviewCount"></span>
+                        </div>
+                        <div class="price">
+                            <span id="currentPrice" class="current-price"></span>
+                            <span id="originalPrice" class="original-price"></span>
+                            <span id="discount" class="discount"></span>
+                        </div>
+                        <div class="product-features">
+                            <ul id="featuresList"></ul>
+                        </div>
+                        <div class="quantity-selector">
+                            <label>Quantity:</label>
+                            <select id="quantity">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="add-to-cart" onclick="addToCart()">
+                                <i class="fas fa-cart-plus"></i> Add to Cart
+                            </button>
+                            <button class="buy-now" onclick="buyNow()">
+                                <i class="fas fa-bolt"></i> Buy Now
+                            </button>
+                            <button class="wishlist" onclick="addToWishlist()">
+                                <i class="far fa-heart"></i> Add to Wishlist
+                            </button>
+                        </div>
+                        <div class="delivery-info">
+                            <div class="delivery-option">
+                                <i class="fas fa-truck"></i>
+                                <span>Free delivery by tomorrow</span>
+                            </div>
+                            <div class="delivery-option">
+                                <i class="fas fa-undo"></i>
+                                <span>30-day return policy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="product-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" onclick="showTab('description')">Description</button>
+                        <button class="tab-btn" onclick="showTab('specifications')">Specifications</button>
+                        <button class="tab-btn" onclick="showTab('reviews')">Reviews</button>
+                    </div>
+                    <div id="description" class="tab-content active">
+                        <div id="productDescription"></div>
+                    </div>
+                    <div id="specifications" class="tab-content">
+                        <div id="productSpecs"></div>
+                    </div>
+                    <div id="reviews" class="tab-content">
+                        <div id="productReviews"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cart Page -->
+        <div id="cartPage" class="page">
+            <div class="container">
+                <h1>Shopping Cart</h1>
+                <div id="cartItems" class="cart-items"></div>
+                <div class="cart-summary">
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">$0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Shipping:</span>
+                        <span id="shipping">Free</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span id="total">$0.00</span>
+                    </div>
+                    <button class="checkout-btn" onclick="checkout()">
+                        Proceed to Checkout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Sign In</h2>
+            <form id="loginForm" onsubmit="login(event)">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit" id="loginBtn">Sign In</button>
+                <div id="loginError" class="error-text"></div>
+            </form>
+            <p>Don't have an account? <a href="#" onclick="showRegister()">Register</a></p>
+        </div>
+    </div>
+
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            <h2>Create Account</h2>
+            <form id="registerForm" onsubmit="register(event)">
+                <input type="text" id="registerName" placeholder="Full Name" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Password" minlength="6" required>
+                <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+                <button type="submit" id="registerBtn">Create Account</button>
+                <div id="registerError" class="error-text"></div>
+            </form>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+    <script src="cart-api.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

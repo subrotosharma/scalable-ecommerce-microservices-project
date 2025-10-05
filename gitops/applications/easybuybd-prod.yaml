@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: easybuybd-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/subrotosharma/easybuybd-ecommerce.git
+    targetRevision: main
+    path: helm/easybuybd
+    helm:
+      valueFiles:
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: easybuybd-prod
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    # Manual sync for production
+    retry:
+      limit: 3

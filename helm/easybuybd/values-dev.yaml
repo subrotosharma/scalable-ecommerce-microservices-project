@@ -1,0 +1,46 @@
+environment: dev
+namespace: easybuybd-dev
+
+image:
+  tag: latest
+
+services:
+  apiGateway:
+    replicas: 1
+    type: NodePort
+  userService:
+    replicas: 1
+  cartService:
+    replicas: 1
+  productService:
+    replicas: 1
+  orderService:
+    replicas: 1
+  paymentService:
+    replicas: 1
+
+postgresql:
+  primary:
+    persistence:
+      size: 5Gi
+
+redis:
+  master:
+    persistence:
+      size: 2Gi
+
+ingress:
+  hosts:
+    - host: api-dev.easybuybd.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api-gateway
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi

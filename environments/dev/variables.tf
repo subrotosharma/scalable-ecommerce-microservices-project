@@ -42,19 +42,19 @@ variable "kubernetes_version" {
 variable "eks_instance_types" {
   description = "Instance types for EKS node group"
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["t3.large"]
 }
 
 variable "eks_desired_capacity" {
   description = "Desired capacity for EKS node group"
   type        = number
-  default     = 2
+  default     = 4
 }
 
 variable "eks_max_capacity" {
   description = "Maximum capacity for EKS node group"
   type        = number
-  default     = 4
+  default     = 8
 }
 
 variable "eks_min_capacity" {

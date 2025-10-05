@@ -1,0 +1,168 @@
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Environment
+environment: dev
+namespace: easybuybd-dev
+
+# Image configuration
+image:
+  registry: easybuybd
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Services configuration
+services:
+  apiGateway:
+    enabled: true
+    name: api-gateway
+    port: 8000
+    replicas: 2
+    type: LoadBalancer
+    
+  userService:
+    enabled: true
+    name: user-service
+    port: 8080
+    replicas: 2
+    
+  cartService:
+    enabled: true
+    name: cart-service
+    port: 8081
+    replicas: 2
+    
+  productService:
+    enabled: true
+    name: product-service
+    port: 8084
+    replicas: 2
+    
+  orderService:
+    enabled: true
+    name: order-service
+    port: 8083
+    replicas: 2
+    
+  paymentService:
+    enabled: true
+    name: payment-service
+    port: 8082
+    replicas: 2
+    
+  inventoryService:
+    enabled: true
+    name: inventory-service
+    port: 8085
+    replicas: 1
+    
+  searchService:
+    enabled: true
+    name: search-service
+    port: 8087
+    replicas: 2
+    
+  reviewService:
+    enabled: true
+    name: review-service
+    port: 8088
+    replicas: 1
+    
+  wishlistService:
+    enabled: true
+    name: wishlist-service
+    port: 8090
+    replicas: 1
+    
+  profileService:
+    enabled: true
+    name: profile-service
+    port: 8086
+    replicas: 1
+    
+  notificationService:
+    enabled: true
+    name: notification-service
+    port: 8089
+    replicas: 1
+    
+  adminService:
+    enabled: true
+    name: admin-service
+    port: 8091
+    replicas: 1
+    
+  monitoringService:
+    enabled: true
+    name: monitoring-service
+    port: 8092
+    replicas: 1
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: password123
+    username: dbadmin
+    password: password123
+    database: easybuybd
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+# Redis configuration  
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Secrets
+secrets:
+  jwtSecret: your-super-secret-jwt-key-change-in-production
+  stripeSecretKey: sk_test_your_stripe_secret_key
+  emailPassword: your-email-password
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: api.easybuybd.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api-gateway
+  tls: []
+
+# Resource limits
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Health checks
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80

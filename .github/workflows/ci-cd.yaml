@@ -1,0 +1,118 @@
+name: E-commerce CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: ecommerce-services
+  EKS_CLUSTER_NAME: ecommerce-cluster
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        npm install
+        npm install -g jest supertest
+        
+    - name: Run unit tests
+      run: npm test
+      
+    - name: Run integration tests
+      run: npm run test:integration
+      
+    - name: Security scan
+      run: |
+        npm audit
+        npx snyk test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Login to ECR
+      run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+      
+    - name: Build and push images
+      run: |
+        services=("user-service" "product-service" "order-service" "payment-service" "cart-service")
+        for service in "${services[@]}"; do
+          docker build -t $service:${{ github.sha }} ./services/$service
+          docker tag $service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$service:${{ github.sha }}
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$service:${{ github.sha }}
+        done
+
+  update-gitops:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITOPS_TOKEN }}
+        
+    - name: Update GitOps manifests
+      run: |
+        # Update image tags in Kustomization
+        cd gitops/manifests/staging
+        
+        # Update user-service image
+        sed -i "s|easybuybd/user-service:.*|easybuybd/user-service:${{ github.sha }}|" kustomization.yaml
+        sed -i "s|easybuybd/api-gateway:.*|easybuybd/api-gateway:${{ github.sha }}|" kustomization.yaml
+        
+        # Commit and push changes
+        git config --local user.email "gitops@easybuybd.com"
+        git config --local user.name "GitOps Bot"
+        git add .
+        git commit -m "🚀 Update staging images to ${{ github.sha }}" || exit 0
+        git push
+
+  deploy-production:
+    needs: update-gitops
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITOPS_TOKEN }}
+        
+    - name: Promote to Production
+      run: |
+        # Copy staging manifests to production
+        cp -r gitops/manifests/staging/* gitops/manifests/prod/
+        
+        # Update namespace in production manifests
+        sed -i 's/easybuybd-staging/easybuybd-prod/g' gitops/manifests/prod/*.yaml
+        
+        # Commit production deployment
+        git config --local user.email "gitops@easybuybd.com"
+        git config --local user.name "GitOps Bot"
+        git add gitops/manifests/prod/
+        git commit -m "🚀 Deploy to production: ${{ github.sha }}" || exit 0
+        git push

@@ -1,0 +1,51 @@
+{
+  "name": "easybuybd-microservices",
+  "version": "2.1.0",
+  "description": "EasyBuyBD E-commerce Microservices",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm run install-auth && npm run install-api-gateway && npm run install-user && npm run install-cart && npm run install-payment && npm run install-order && npm run install-product && npm run install-inventory && npm run install-profile && npm run install-search && npm run install-review && npm run install-notification && npm run install-wishlist && npm run install-admin && npm run install-monitoring",
+    "install-auth": "cd middleware && npm install",
+    "install-api-gateway": "cd api-gateway && npm install",
+    "install-user": "cd user-service && npm install",
+    "install-cart": "cd cart-service && npm install",
+    "install-payment": "cd payment-service && npm install",
+    "install-order": "cd order-service && npm install",
+    "install-product": "cd product-service && npm install",
+    "install-inventory": "cd inventory-service && npm install",
+    "install-profile": "cd profile-service && npm install",
+    "install-search": "cd search-service && npm install",
+    "install-review": "cd review-service && npm install",
+    "install-notification": "cd notification-service && npm install",
+    "install-wishlist": "cd wishlist-service && npm install",
+    "install-admin": "cd admin-service && npm install",
+    "install-monitoring": "cd monitoring-service && npm install"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "csurf": "^1.11.0",
+    "express-rate-limit": "^6.7.0",
+    "winston": "^3.8.2",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "stripe": "^12.9.0",
+    "nodemailer": "^6.9.3",
+    "node-fetch": "^2.6.11",
+    "express-validator": "^7.0.1",
+    "validator": "^13.9.0",
+    "prom-client": "^14.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22",
+    "jest": "^29.5.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "author": "EasyBuyBD Team",
+  "license": "MIT"
+}

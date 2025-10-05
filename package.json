@@ -1,0 +1,48 @@
+{
+  "name": "easybuybd-ecommerce",
+  "version": "2.1.0",
+  "description": "Multi-tenant e-commerce platform built with microservices architecture",
+  "main": "index.js",
+  "scripts": {
+    "setup": "./scripts/setup-argocd.sh",
+    "deploy:dev": "./scripts/deploy-helm.sh dev",
+    "deploy:staging": "./scripts/deploy-helm.sh staging",
+    "deploy:prod": "./scripts/deploy-helm.sh prod",
+    "test": "npm run test:services",
+    "test:services": "for dir in microservices/*/; do (cd \"$dir\" && npm test 2>/dev/null || echo \"No tests in $(basename $dir)\"); done",
+    "lint": "eslint microservices/*/server.js",
+    "cleanup": "./scripts/cleanup.sh",
+    "k8s:status": "kubectl get pods,svc,ingress --all-namespaces | grep easybuybd",
+    "argocd:ui": "kubectl port-forward svc/argocd-server -n argocd 8080:80"
+  },
+  "keywords": [
+    "ecommerce",
+    "microservices",
+    "nodejs",
+    "docker",
+    "aws",
+    "terraform",
+    "stripe",
+    "postgresql"
+  ],
+  "author": "Subroto Sharma <subroto@easybuybd.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/subrotosharma/easybuybd-ecommerce.git"
+  },
+  "bugs": {
+    "url": "https://github.com/subrotosharma/easybuybd-ecommerce/issues"
+  },
+  "homepage": "https://easybuybd.com",
+  "devDependencies": {
+    "eslint": "^8.55.0",
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

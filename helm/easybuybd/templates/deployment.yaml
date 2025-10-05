@@ -1,0 +1,101 @@
+{{- range $serviceName, $service := .Values.services }}
+{{- if $service.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $service.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{ $service.name }}
+    chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+    release: {{ $.Release.Name }}
+    heritage: {{ $.Release.Service }}
+    environment: {{ $.Values.environment }}
+spec:
+  replicas: {{ $service.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ $service.name }}
+      release: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $service.name }}
+        release: {{ $.Release.Name }}
+        environment: {{ $.Values.environment }}
+    spec:
+      containers:
+      - name: {{ $service.name }}
+        image: "{{ $.Values.image.registry }}/{{ $service.name }}:{{ $.Values.image.tag }}"
+        imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ $service.port }}
+          name: http
+        env:
+        - name: NODE_ENV
+          value: {{ $.Values.environment }}
+        - name: PORT
+          value: "{{ $service.port }}"
+        {{- if or (eq $service.name "user-service") (eq $service.name "cart-service") (eq $service.name "order-service") (eq $service.name "product-service") (eq $service.name "inventory-service") (eq $service.name "profile-service") (eq $service.name "review-service") (eq $service.name "search-service") (eq $service.name "wishlist-service") (eq $service.name "admin-service") }}
+        - name: DB_HOST
+          value: {{ $.Release.Name }}-postgresql
+        - name: DB_NAME
+          value: {{ $.Values.postgresql.auth.database }}
+        - name: DB_USER
+          value: {{ $.Values.postgresql.auth.username }}
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Release.Name }}-postgresql
+              key: password
+        {{- end }}
+        {{- if or (eq $service.name "user-service") (eq $service.name "cart-service") }}
+        - name: REDIS_HOST
+          value: {{ $.Release.Name }}-redis-master
+        {{- end }}
+        {{- if or (eq $service.name "user-service") (eq $service.name "cart-service") (eq $service.name "order-service") (eq $service.name "payment-service") (eq $service.name "profile-service") (eq $service.name "review-service") (eq $service.name "wishlist-service") (eq $service.name "admin-service") }}
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Release.Name }}-secrets
+              key: jwt-secret
+        {{- end }}
+        {{- if eq $service.name "payment-service" }}
+        - name: STRIPE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Release.Name }}-secrets
+              key: stripe-secret-key
+        {{- end }}
+        {{- if eq $service.name "notification-service" }}
+        - name: EMAIL_USER
+          value: noreply@easybuybd.com
+        - name: EMAIL_PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ $.Release.Name }}-secrets
+              key: email-password
+        {{- end }}
+        {{- if eq $service.name "api-gateway" }}
+        - name: ALLOWED_ORIGINS
+          value: "http://localhost:3000,https://{{ $.Values.environment }}.easybuybd.com"
+        {{- end }}
+        {{- if $.Values.healthCheck.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ $.Values.healthCheck.path }}
+            port: {{ $service.port }}
+          initialDelaySeconds: {{ $.Values.healthCheck.initialDelaySeconds }}
+          periodSeconds: {{ $.Values.healthCheck.periodSeconds }}
+        readinessProbe:
+          httpGet:
+            path: {{ $.Values.healthCheck.path }}
+            port: {{ $service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        {{- end }}
+        resources:
+          {{- toYaml $.Values.resources | nindent 10 }}
+{{- end }}
+{{- end }}
