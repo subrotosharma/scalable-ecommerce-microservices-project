@@ -29,10 +29,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/subrotosharma/easybuybd-ecommerce.git"
+    "url": "https://github.com/subrotosharma/scalable-ecommerce-microservices-project.git"
   },
   "bugs": {
-    "url": "https://github.com/subrotosharma/easybuybd-ecommerce/issues"
+    "url": "https://github.com/subrotosharma/scalable-ecommerce-microservices-project/issues"
   },
   "homepage": "https://easybuybd.com",
   "devDependencies": {
